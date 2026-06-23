@@ -62,14 +62,15 @@ const projects = await getCollection('portfolio');
 		margin-top: 2rem;
 	}
 	.project-card {
-		border: 1px solid #ccc;
+		border: 1px solid rgba(var(--gray), 30%);
 		border-radius: 8px;
 		padding: 1.5rem;
 		transition: transform 0.2s, box-shadow 0.2s;
+		background: var(--bg-color);
 	}
 	.project-card:hover {
 		transform: translateY(-4px);
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+		box-shadow: 0 4px 12px rgba(var(--black), 0.1);
 	}
 	.project-card a {
 		color: inherit;
@@ -78,11 +79,13 @@ const projects = await getCollection('portfolio');
 	.project-card h2 {
 		font-size: 1.25rem;
 		margin: 0 0 0.5rem 0;
+		color: var(--text-color);
 	}
 	.description {
-		color: #666;
+		color: var(--text-color);
 		margin: 0 0 1rem 0;
 		line-height: 1.5;
+		opacity: 0.85;
 	}
 	.tags {
 		display: flex;
@@ -91,8 +94,8 @@ const projects = await getCollection('portfolio');
 	}
 	.tag {
 		display: inline-block;
-		background: #f0f0f0;
-		color: #333;
+		background: rgba(var(--gray), 20%);
+		color: var(--text-color);
 		padding: 0.25rem 0.75rem;
 		border-radius: 20px;
 		font-size: 0.85rem;

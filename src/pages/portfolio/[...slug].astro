@@ -60,17 +60,19 @@ const { Content } = await render(project);
 	.title {
 		margin: 0 0 1rem 0;
 		font-size: 2rem;
+		color: var(--text-color);
 	}
 	.description {
-		color: #666;
+		color: var(--text-color);
 		font-size: 1.1rem;
 		margin-bottom: 1rem;
+		opacity: 0.85;
 	}
 	.link {
 		margin-bottom: 1rem;
 	}
 	.link a {
-		color: #0ea5e9;
+		color: var(--accent);
 		text-decoration: none;
 	}
 	.link a:hover {
@@ -84,22 +86,22 @@ const { Content } = await render(project);
 	}
 	.tag {
 		display: inline-block;
-		background: #f0f0f0;
-		color: #333;
+		background: rgba(var(--gray), 20%);
+		color: var(--text-color);
 		padding: 0.25rem 0.75rem;
 		border-radius: 20px;
 		font-size: 0.85rem;
 	}
 	hr {
 		border: 0;
-		border-top: 1px solid #ccc;
+		border-top: 1px solid rgba(var(--gray), 30%);
 		margin: 2rem 0;
 	}
 	nav {
 		margin-top: 2rem;
 	}
 	nav a {
-		color: #0ea5e9;
+		color: var(--accent);
 		text-decoration: none;
 	}
 	nav a:hover {

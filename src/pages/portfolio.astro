@@ -22,6 +22,23 @@ interface Repo {
 	pushed_at: string;
 	fork: boolean;
 	langs?: { name: string; pct: number }[];
+	commits?: number;
+	contributors?: number;
+}
+
+// Count a paginated resource without fetching it all: ask for one item per
+// page and read the last-page number off the Link header.
+async function ghCount(url: string, headers: Record<string, string>): Promise<number | undefined> {
+	try {
+		const res = await fetch(`${url}${url.includes('?') ? '&' : '?'}per_page=1`, { headers });
+		if (!res.ok) return undefined; // 409 = empty repo, 403 = rate limited
+		const last = res.headers.get('link')?.match(/[?&]page=(\d+)>; rel="last"/);
+		if (last) return Number(last[1]);
+		const body = (await res.json()) as unknown[];
+		return Array.isArray(body) ? body.length : undefined;
+	} catch {
+		return undefined;
+	}
 }
 // Optional: a GITHUB_TOKEN env var (5,000 req/hr) instead of the
 // unauthenticated 60/hr per-IP limit shared by every build from this machine.
@@ -67,6 +84,9 @@ for (const repo of repos) {
 	} catch {
 		/* skip bar for this repo */
 	}
+	const base = `https://api.github.com/repos/${GH_USER}/${repo.name}`;
+	repo.commits = await ghCount(`${base}/commits`, ghHeaders);
+	repo.contributors = await ghCount(`${base}/contributors?anon=true`, ghHeaders);
 }
 
 const LANG_COLORS: Record<string, string> = {
@@ -142,6 +162,8 @@ const fmtSize = (kb: number) =>
 									<p class="repo-stats">
 										{repo.stargazers_count > 0 && <span>★ {repo.stargazers_count}</span>}
 										{repo.forks_count > 0 && <span>⑂ {repo.forks_count}</span>}
+										{repo.commits && <span>{repo.commits.toLocaleString()} {repo.commits === 1 ? 'commit' : 'commits'}</span>}
+										{(repo.contributors ?? 0) > 1 && <span>{repo.contributors} contributors</span>}
 										{repo.open_issues_count > 0 && <span>{repo.open_issues_count} open issues</span>}
 										<span>{fmtSize(repo.size)}</span>
 										<span>since {new Date(repo.created_at).getFullYear()}</span>

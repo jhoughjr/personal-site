@@ -58,16 +58,18 @@ try {
 	// Offline or rate-limited build: the page still ships, with a profile link below.
 }
 
-// One /languages call per repo (~44/build, under the unauthenticated 60/hr
-// limit), fetched sequentially — a concurrent burst trips GitHub's secondary
-// rate limit. Any failure just drops that repo's language bar, never the build.
-for (const repo of repos) {
+// Three calls per repo (languages, commits, contributors), batched a few
+// repos at a time: a full-fanout burst trips GitHub's secondary rate limit
+// (even authenticated it's a risk), while fully sequential takes ~40s of the
+// build. Any failure just drops that repo's stats, never the build.
+async function enrich(repo: Repo) {
+	const base = `https://api.github.com/repos/${GH_USER}/${repo.name}`;
 	try {
-		let res = await fetch(`https://api.github.com/repos/${GH_USER}/${repo.name}/languages`, { headers: ghHeaders });
+		let res = await fetch(`${base}/languages`, { headers: ghHeaders });
 		if (res.status === 403 || res.status === 429) {
 			const wait = Number(res.headers.get('retry-after')) || 30;
 			await new Promise((r) => setTimeout(r, wait * 1000));
-			res = await fetch(`https://api.github.com/repos/${GH_USER}/${repo.name}/languages`, { headers: ghHeaders });
+			res = await fetch(`${base}/languages`, { headers: ghHeaders });
 		}
 		if (res.ok) {
 			const bytes = (await res.json()) as Record<string, number>;
@@ -84,9 +86,13 @@ for (const repo of repos) {
 	} catch {
 		/* skip bar for this repo */
 	}
-	const base = `https://api.github.com/repos/${GH_USER}/${repo.name}`;
 	repo.commits = await ghCount(`${base}/commits`, ghHeaders);
 	repo.contributors = await ghCount(`${base}/contributors?anon=true`, ghHeaders);
+}
+
+const BATCH = 5;
+for (let i = 0; i < repos.length; i += BATCH) {
+	await Promise.all(repos.slice(i, i + BATCH).map(enrich));
 }
 
 const LANG_COLORS: Record<string, string> = {

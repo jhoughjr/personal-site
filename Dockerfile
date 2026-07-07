@@ -1,4 +1,6 @@
 FROM node:22-alpine AS builder
+ARG GITHUB_TOKEN
+ENV GITHUB_TOKEN=$GITHUB_TOKEN
 WORKDIR /app
 COPY package*.json ./
 RUN npm install

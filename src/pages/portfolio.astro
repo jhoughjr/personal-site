@@ -23,9 +23,15 @@ interface Repo {
 	fork: boolean;
 	langs?: { name: string; pct: number }[];
 }
+// Optional: a GITHUB_TOKEN env var (5,000 req/hr) instead of the
+// unauthenticated 60/hr per-IP limit shared by every build from this machine.
+const ghHeaders: Record<string, string> = process.env.GITHUB_TOKEN
+	? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` }
+	: {};
+
 let repos: Repo[] = [];
 try {
-	const res = await fetch(`https://api.github.com/users/${GH_USER}/repos?per_page=100&type=owner`);
+	const res = await fetch(`https://api.github.com/users/${GH_USER}/repos?per_page=100&type=owner`, { headers: ghHeaders });
 	if (res.ok) {
 		repos = ((await res.json()) as Repo[])
 			.filter((r) => !r.fork)
@@ -40,11 +46,11 @@ try {
 // rate limit. Any failure just drops that repo's language bar, never the build.
 for (const repo of repos) {
 	try {
-		let res = await fetch(`https://api.github.com/repos/${GH_USER}/${repo.name}/languages`);
+		let res = await fetch(`https://api.github.com/repos/${GH_USER}/${repo.name}/languages`, { headers: ghHeaders });
 		if (res.status === 403 || res.status === 429) {
 			const wait = Number(res.headers.get('retry-after')) || 30;
 			await new Promise((r) => setTimeout(r, wait * 1000));
-			res = await fetch(`https://api.github.com/repos/${GH_USER}/${repo.name}/languages`);
+			res = await fetch(`https://api.github.com/repos/${GH_USER}/${repo.name}/languages`, { headers: ghHeaders });
 		}
 		if (res.ok) {
 			const bytes = (await res.json()) as Record<string, number>;

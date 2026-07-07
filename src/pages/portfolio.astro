@@ -36,26 +36,32 @@ try {
 }
 
 // One /languages call per repo (~44/build, under the unauthenticated 60/hr
-// limit). Any failure just drops that repo's language bar, never the build.
-await Promise.all(
-	repos.map(async (repo) => {
-		try {
-			const res = await fetch(`https://api.github.com/repos/${GH_USER}/${repo.name}/languages`);
-			if (!res.ok) return;
+// limit), fetched sequentially — a concurrent burst trips GitHub's secondary
+// rate limit. Any failure just drops that repo's language bar, never the build.
+for (const repo of repos) {
+	try {
+		let res = await fetch(`https://api.github.com/repos/${GH_USER}/${repo.name}/languages`);
+		if (res.status === 403 || res.status === 429) {
+			const wait = Number(res.headers.get('retry-after')) || 30;
+			await new Promise((r) => setTimeout(r, wait * 1000));
+			res = await fetch(`https://api.github.com/repos/${GH_USER}/${repo.name}/languages`);
+		}
+		if (res.ok) {
 			const bytes = (await res.json()) as Record<string, number>;
 			const total = Object.values(bytes).reduce((s, b) => s + b, 0);
-			if (!total) return;
-			const entries = Object.entries(bytes)
-				.sort((a, b) => b[1] - a[1])
-				.map(([name, b]) => ({ name, pct: (b / total) * 100 }));
-			const top = entries.filter((e, i) => i < 3 && e.pct >= 1);
-			const rest = 100 - top.reduce((s, e) => s + e.pct, 0);
-			repo.langs = rest >= 1 ? [...top, { name: 'Other', pct: rest }] : top;
-		} catch {
-			/* skip bar for this repo */
+			if (total) {
+				const entries = Object.entries(bytes)
+					.sort((a, b) => b[1] - a[1])
+					.map(([name, b]) => ({ name, pct: (b / total) * 100 }));
+				const top = entries.filter((e, i) => i < 3 && e.pct >= 1);
+				const rest = 100 - top.reduce((s, e) => s + e.pct, 0);
+				repo.langs = rest >= 1 ? [...top, { name: 'Other', pct: rest }] : top;
+			}
 		}
-	})
-);
+	} catch {
+		/* skip bar for this repo */
+	}
+}
 
 const LANG_COLORS: Record<string, string> = {
 	Swift: '#f05138', Python: '#3572a5', 'C++': '#f34b7d', C: '#555555',

@@ -66,4 +66,4 @@ His first line of defense against all of this is verification — reading ingred
 
 The short version: this is not a food preference and not a textbook allergy. It is an unstable, multi-system condition in which food, temperature, medication, and his own physiology can each provoke a reaction — sometimes a dangerous one, sometimes hours after the fact, and rarely on a schedule anyone can predict. It is serious, it is real, and it deserves to be understood as such.
 
-<small>*Prepared to explain Jimmy's conditions to the people closest to him. It reflects his medical reality as he understands it and is not a substitute for the guidance of his physicians — but the seriousness, and the way these conditions compound one another, is clinically real.*</small>
+<small>*Prepared to explain Jimmy's conditions to the people closest to him. It reflects his medical reality as he understands it and is not a substitute for the guidance of his physicians — but* **the seriousness, and the way these conditions compound one another, is clinically real.**</small>

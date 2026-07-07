@@ -3,9 +3,34 @@ import { getCollection } from 'astro:content';
 import BaseHead from '../components/BaseHead.astro';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
-import { SITE_TITLE, SITE_DESCRIPTION } from '../consts';
+import { SITE_TITLE } from '../consts';
 
 const projects = await getCollection('portfolio');
+
+// Fetched at build time — the list refreshes on each deploy.
+const GH_USER = 'jhoughjr';
+interface Repo {
+	name: string;
+	html_url: string;
+	description: string | null;
+	language: string | null;
+	stargazers_count: number;
+	pushed_at: string;
+	fork: boolean;
+}
+let repos: Repo[] = [];
+try {
+	const res = await fetch(`https://api.github.com/users/${GH_USER}/repos?per_page=100&type=owner`);
+	if (res.ok) {
+		repos = ((await res.json()) as Repo[])
+			.filter((r) => !r.fork)
+			.sort((a, b) => Date.parse(b.pushed_at) - Date.parse(a.pushed_at));
+	}
+} catch {
+	// Offline or rate-limited build: the page still ships, with a profile link below.
+}
+const fmtDate = (iso: string) =>
+	new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
 ---
 
 <!doctype html>
@@ -20,24 +45,52 @@ const projects = await getCollection('portfolio');
 				<h1>Portfolio</h1>
 				<p>Things I've built:</p>
 			</section>
+			{projects.length > 0 && (
+				<section>
+					<h2 class="section-title">Featured</h2>
+					<ul class="projects">
+						{projects.map((project) => (
+							<li class="project-card">
+								<a href={`/portfolio/${project.slug}/`}>
+									<h2>{project.data.title}</h2>
+									<p class="description">{project.data.description}</p>
+									{project.data.tags && (
+										<div class="tags">
+											{project.data.tags.map((tag) => (
+												<span class="tag">{tag}</span>
+											))}
+										</div>
+									)}
+								</a>
+							</li>
+						))}
+					</ul>
+				</section>
+			)}
 			<section>
-				<ul class="projects">
-					{projects.map((project) => (
-						<li class="project-card">
-							<a href={`/portfolio/${project.slug}/`}>
-								<h2>{project.data.title}</h2>
-								<p class="description">{project.data.description}</p>
-								{project.data.tags && (
+				<h2 class="section-title">On GitHub</h2>
+				{repos.length > 0 ? (
+					<ul class="projects">
+						{repos.map((repo) => (
+							<li class="project-card">
+								<a href={repo.html_url} target="_blank" rel="noopener">
+									<h2>{repo.name}</h2>
+									{repo.description && <p class="description">{repo.description}</p>}
 									<div class="tags">
-										{project.data.tags.map((tag) => (
-											<span class="tag">{tag}</span>
-										))}
+										{repo.language && <span class="tag">{repo.language}</span>}
+										{repo.stargazers_count > 0 && <span class="tag">★ {repo.stargazers_count}</span>}
 									</div>
-								)}
-							</a>
-						</li>
-					))}
-				</ul>
+									<p class="repo-meta">Updated {fmtDate(repo.pushed_at)}</p>
+								</a>
+							</li>
+						))}
+					</ul>
+				) : (
+					<p>
+						Couldn't reach GitHub when this page was built — browse my projects at
+						<a href={`https://github.com/${GH_USER}`}>github.com/{GH_USER}</a>.
+					</p>
+				)}
 			</section>
 		</main>
 		<Footer />
@@ -52,6 +105,10 @@ const projects = await getCollection('portfolio');
 		font-size: 2rem;
 		font-weight: bold;
 		margin: 0;
+	}
+	.section-title {
+		font-size: 1.3rem;
+		margin: 2.5rem 0 0;
 	}
 	.projects {
 		list-style: none;
@@ -99,5 +156,11 @@ const projects = await getCollection('portfolio');
 		padding: 0.25rem 0.75rem;
 		border-radius: 20px;
 		font-size: 0.85rem;
+	}
+	.repo-meta {
+		margin: 0.75rem 0 0;
+		font-size: 0.8rem;
+		color: var(--text-color);
+		opacity: 0.6;
 	}
 </style>

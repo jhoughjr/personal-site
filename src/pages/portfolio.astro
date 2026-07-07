@@ -15,8 +15,13 @@ interface Repo {
 	description: string | null;
 	language: string | null;
 	stargazers_count: number;
+	forks_count: number;
+	open_issues_count: number;
+	size: number; // KB
+	created_at: string;
 	pushed_at: string;
 	fork: boolean;
+	langs?: { name: string; pct: number }[];
 }
 let repos: Repo[] = [];
 try {
@@ -29,8 +34,42 @@ try {
 } catch {
 	// Offline or rate-limited build: the page still ships, with a profile link below.
 }
+
+// One /languages call per repo (~44/build, under the unauthenticated 60/hr
+// limit). Any failure just drops that repo's language bar, never the build.
+await Promise.all(
+	repos.map(async (repo) => {
+		try {
+			const res = await fetch(`https://api.github.com/repos/${GH_USER}/${repo.name}/languages`);
+			if (!res.ok) return;
+			const bytes = (await res.json()) as Record<string, number>;
+			const total = Object.values(bytes).reduce((s, b) => s + b, 0);
+			if (!total) return;
+			const entries = Object.entries(bytes)
+				.sort((a, b) => b[1] - a[1])
+				.map(([name, b]) => ({ name, pct: (b / total) * 100 }));
+			const top = entries.filter((e, i) => i < 3 && e.pct >= 1);
+			const rest = 100 - top.reduce((s, e) => s + e.pct, 0);
+			repo.langs = rest >= 1 ? [...top, { name: 'Other', pct: rest }] : top;
+		} catch {
+			/* skip bar for this repo */
+		}
+	})
+);
+
+const LANG_COLORS: Record<string, string> = {
+	Swift: '#f05138', Python: '#3572a5', 'C++': '#f34b7d', C: '#555555',
+	'Objective-C': '#438eff', HTML: '#e34c26', CSS: '#663399', JavaScript: '#f1e05a',
+	TypeScript: '#3178c6', Shell: '#89e051', AppleScript: '#101f1f', Astro: '#ff5a03',
+	Rust: '#dea584', Ruby: '#701516', Dockerfile: '#384d54', Makefile: '#427819',
+	Other: '#9a9a9a',
+};
+const langColor = (name: string) => LANG_COLORS[name] ?? '#9a9a9a';
+
 const fmtDate = (iso: string) =>
 	new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
+const fmtSize = (kb: number) =>
+	kb < 1024 ? `${kb} KB` : `${(kb / 1024).toFixed(kb < 10240 ? 1 : 0)} MB`;
 ---
 
 <!doctype html>
@@ -76,10 +115,25 @@ const fmtDate = (iso: string) =>
 								<a href={repo.html_url} target="_blank" rel="noopener">
 									<h2>{repo.name}</h2>
 									{repo.description && <p class="description">{repo.description}</p>}
-									<div class="tags">
-										{repo.language && <span class="tag">{repo.language}</span>}
-										{repo.stargazers_count > 0 && <span class="tag">★ {repo.stargazers_count}</span>}
-									</div>
+									{repo.langs && (
+										<div class="langs">
+											<div class="lang-bar" role="img" aria-label={repo.langs.map((l) => `${l.name} ${Math.round(l.pct)}%`).join(', ')}>
+												{repo.langs.map((l) => (
+													<span style={`flex-grow:${l.pct};background:${langColor(l.name)}`} />
+												))}
+											</div>
+											<p class="lang-names">
+												{repo.langs.map((l) => `${l.name} ${Math.round(l.pct)}%`).join(' · ')}
+											</p>
+										</div>
+									)}
+									<p class="repo-stats">
+										{repo.stargazers_count > 0 && <span>★ {repo.stargazers_count}</span>}
+										{repo.forks_count > 0 && <span>⑂ {repo.forks_count}</span>}
+										{repo.open_issues_count > 0 && <span>{repo.open_issues_count} open issues</span>}
+										<span>{fmtSize(repo.size)}</span>
+										<span>since {new Date(repo.created_at).getFullYear()}</span>
+									</p>
 									<p class="repo-meta">Updated {fmtDate(repo.pushed_at)}</p>
 								</a>
 							</li>
@@ -157,8 +211,36 @@ const fmtDate = (iso: string) =>
 		border-radius: 20px;
 		font-size: 0.85rem;
 	}
-	.repo-meta {
+	.langs {
+		margin: 0.9rem 0 0;
+	}
+	.lang-bar {
+		display: flex;
+		gap: 2px;
+		height: 6px;
+		border-radius: 3px;
+		overflow: hidden;
+	}
+	.lang-bar span {
+		min-width: 3px;
+	}
+	.lang-names {
+		margin: 0.35rem 0 0;
+		font-size: 0.75rem;
+		color: var(--text-color);
+		opacity: 0.7;
+	}
+	.repo-stats {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.35rem 1rem;
 		margin: 0.75rem 0 0;
+		font-size: 0.8rem;
+		color: var(--text-color);
+		opacity: 0.75;
+	}
+	.repo-meta {
+		margin: 0.35rem 0 0;
 		font-size: 0.8rem;
 		color: var(--text-color);
 		opacity: 0.6;

@@ -3,7 +3,23 @@ const today = new Date();
 ---
 
 <footer>
-	&copy; {today.getFullYear()} Jimmy Hough Jr. All rights reserved.
+	<nav class="cols" aria-label="Footer">
+		<div>
+			<h4>Site</h4>
+			<a href="/">Home</a>
+			<a href="/blog/">Blog</a>
+			<a href="/portfolio/">Portfolio</a>
+			<a href="/about/">About</a>
+			<a href="/rss.xml">RSS</a>
+		</div>
+		<div>
+			<h4>Things I run</h4>
+			<a href="https://status.jimmyhoughjr.net">Status</a>
+			<a href="https://watts.jimmyhoughjr.net">Watts</a>
+			<a href="https://head2head.jimmyhoughjr.net">head2head</a>
+		</div>
+	</nav>
+	<p class="copy">&copy; {today.getFullYear()} Jimmy Hough Jr. All rights reserved.</p>
 </footer>
 <style>
 	footer {
@@ -12,6 +28,35 @@ const today = new Date();
 		color: var(--text-color);
 		text-align: center;
 	}
+	.cols {
+		display: flex;
+		justify-content: center;
+		gap: 4em;
+		text-align: left;
+		margin-bottom: 1.5em;
+	}
+	.cols h4 {
+		margin: 0 0 0.4em;
+		font-size: 0.8em;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+		opacity: 0.6;
+	}
+	.cols a {
+		display: block;
+		color: var(--text-color);
+		text-decoration: none;
+		padding: 0.15em 0;
+	}
+	.cols a:hover {
+		color: var(--accent);
+	}
+	.copy {
+		margin: 0;
+		opacity: 0.7;
+		font-size: 0.9em;
+	}
+
 	html.dark footer {
 		border-top: 1px solid rgba(var(--gray), 20%);
 	}

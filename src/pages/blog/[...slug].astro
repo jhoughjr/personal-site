@@ -3,18 +3,59 @@ import { type CollectionEntry, getCollection, render } from 'astro:content';
 import BlogPost from '../../layouts/BlogPost.astro';
 
 export async function getStaticPaths() {
-	const posts = await getCollection('blog');
-	return posts.map((post) => ({
+	const posts = (await getCollection('blog')).sort(
+		(a, b) => a.data.pubDate.valueOf() - b.data.pubDate.valueOf()
+	);
+	return posts.map((post, i) => ({
 		params: { slug: post.id },
-		props: post,
+		props: { post, older: posts[i - 1] ?? null, newer: posts[i + 1] ?? null },
 	}));
 }
-type Props = CollectionEntry<'blog'>;
+type Props = {
+	post: CollectionEntry<'blog'>;
+	older: CollectionEntry<'blog'> | null;
+	newer: CollectionEntry<'blog'> | null;
+};
 
-const post = Astro.props;
+const { post, older, newer } = Astro.props;
 const { Content } = await render(post);
 ---
 
 <BlogPost {...post.data}>
 	<Content />
+	{
+		(older || newer) && (
+			<nav class="post-nav" aria-label="More posts">
+				{older && (
+					<a class="older" href={`/blog/${older.id}/`}>
+						← {older.data.title}
+					</a>
+				)}
+				{newer && (
+					<a class="newer" href={`/blog/${newer.id}/`}>
+						{newer.data.title} →
+					</a>
+				)}
+			</nav>
+		)
+	}
 </BlogPost>
+
+<style>
+	.post-nav {
+		display: flex;
+		justify-content: space-between;
+		gap: 2em;
+		margin-top: 3em;
+		padding-top: 1.5em;
+		border-top: 1px solid rgba(var(--gray), 30%);
+	}
+	.post-nav a {
+		text-decoration: none;
+		max-width: 45%;
+	}
+	.post-nav .newer {
+		text-align: right;
+		margin-left: auto;
+	}
+</style>

@@ -1,45 +1,151 @@
 ---
+import { getCollection } from 'astro:content';
 import BaseHead from '../components/BaseHead.astro';
 import Footer from '../components/Footer.astro';
+import FormattedDate from '../components/FormattedDate.astro';
 import Header from '../components/Header.astro';
 import { SITE_DESCRIPTION, SITE_TITLE } from '../consts';
+
+const posts = (await getCollection('blog'))
+	.sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf())
+	.slice(0, 3);
+
+// Fleet status, fetched at build time from the Roost fleet board.
+// Every deploy refreshes the dots; the link goes to the live board.
+let fleet: Record<string, { pill?: { tone?: string }; note?: string }> = {};
+let fleetStamp = '';
+try {
+	const res = await fetch('https://status.jimmyhoughjr.net/fleet/board.json');
+	const board = await res.json();
+	fleetStamp = (board.stamp || '').split(' — ')[0];
+	for (const section of board.sections || []) {
+		if (section.kind !== 'cards') continue;
+		for (const item of section.items || []) fleet[item.id] = item;
+	}
+} catch {
+	/* board unreachable at build time: dots render as unknown */
+}
+
+const services = [
+	{
+		id: 'status',
+		name: 'Status',
+		href: 'https://status.jimmyhoughjr.net',
+		desc: 'live status boards for my projects.',
+	},
+	{
+		id: 'watts',
+		name: 'Watts',
+		href: 'https://watts.jimmyhoughjr.net',
+		desc: 'an electric usage cost calculator: enter your rate, see what your appliances cost to run.',
+	},
+	{
+		id: 'head2head',
+		name: 'head2head',
+		href: 'https://head2head.jimmyhoughjr.net',
+		desc: 'measured implementation shootouts on my home server. First bout: the same service in Node vs Swift/Hummingbird 2.',
+	},
+	{
+		id: 'pulse',
+		name: 'Pulse',
+		href: 'https://pulse.jimmyhoughjr.net',
+		desc: 'realtime CPU and memory for every app on the box.',
+	},
+	{
+		id: 'docs',
+		name: 'Roost',
+		href: 'https://docs.jimmyhoughjr.net',
+		desc: 'the platform all of this runs on: one small box, Dokku, a Cloudflare tunnel, and one command from nothing to a live app.',
+		source: 'https://github.com/jhoughjr/roost',
+	},
+];
+
+function dotClass(id: string) {
+	const pill = fleet[id]?.pill;
+	if (!pill) return 'unknown';
+	return pill.tone === 'go' ? 'up' : 'down';
+}
 ---
 
 <!doctype html>
 <html lang="en">
 	<head>
 		<BaseHead title={SITE_TITLE} description={SITE_DESCRIPTION} />
+		<style>
+			.dot {
+				display: inline-block;
+				width: 0.55em;
+				height: 0.55em;
+				border-radius: 50%;
+				margin-right: 0.4em;
+				vertical-align: baseline;
+			}
+			.dot.up {
+				background: #2e9e44;
+			}
+			.dot.down {
+				background: #c0392b;
+			}
+			.dot.unknown {
+				background: #9a968d;
+			}
+			.fleet-stamp {
+				font-size: 0.8em;
+				color: rgb(var(--gray));
+			}
+			.post-date {
+				font-size: 0.85em;
+				color: rgb(var(--gray));
+				margin-left: 0.5em;
+			}
+		</style>
 	</head>
 	<body>
 		<Header />
 		<main>
 			<h1>Jimmy Hough Jr</h1>
 			<p>
-				Software developer. I write here now and then — see the
+				Software developer, twenty years in — mostly Swift, always agile.
+				Everything on this domain runs on a single small computer in my house.
+				<a href="/about/">More about me</a>, or browse the
 				<a href="/blog/">blog</a> and <a href="/portfolio/">portfolio</a>.
 			</p>
 			<h2>Things I run</h2>
 			<ul>
-				<li>
-					<a href="https://status.jimmyhoughjr.net">Status</a> — live status
-					boards for my projects.
-				</li>
-				<li>
-					<a href="https://watts.jimmyhoughjr.net">Watts</a> — an electric
-					usage cost calculator: enter your rate, see what your appliances
-					cost to run.
-				</li>
-				<li>
-					<a href="https://head2head.jimmyhoughjr.net">head2head</a> — measured
-					implementation shootouts on my home server. First bout: the same
-					service in Node vs Swift/Hummingbird 2.
-				</li>
-				<li>
-					<a href="https://docs.jimmyhoughjr.net">Roost</a> — the platform all
-					of this runs on: one small box, Dokku, a Cloudflare tunnel, and one
-					command from nothing to a live app. Copy the pattern
-					(<a href="https://github.com/jhoughjr/roost">source</a>).
-				</li>
+				{
+					services.map((s) => (
+						<li>
+							<span class={`dot ${dotClass(s.id)}`} title={fleet[s.id]?.note} />
+							<a href={s.href}>{s.name}</a> — {s.desc}
+							{s.source && (
+								<>
+									Copy the pattern (<a href={s.source}>source</a>).
+								</>
+							)}
+						</li>
+					))
+				}
+			</ul>
+			{
+				fleetStamp && (
+					<p class="fleet-stamp">
+						Dots checked at build time ({fleetStamp}) —
+						<a href="https://status.jimmyhoughjr.net/fleet/"> live fleet board</a>.
+					</p>
+				)
+			}
+			<h2>Recent writing</h2>
+			<ul>
+				{
+					posts.map((post) => (
+						<li>
+							<a href={`/blog/${post.id}/`}>{post.data.title}</a>
+							<span class="post-date">
+								<FormattedDate date={post.data.pubDate} />
+							</span>
+						</li>
+					))
+				}
 			</ul>
 		</main>
 		<Footer />

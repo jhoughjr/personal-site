@@ -10,29 +10,41 @@ const posts = (await getCollection('blog'))
 	.sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf())
 	.slice(0, 3);
 
-// Fleet status, fetched at build time from the Roost fleet board.
-// Every deploy refreshes the dots; the link goes to the live board.
-let fleet: Record<string, { pill?: { tone?: string }; note?: string }> = {};
-let fleetStamp = '';
+// Live state, fetched at build time. This used to read the fleet board, but the
+// board moved behind vault sign-in — the fetch returned a login page and every
+// dot silently went grey. Pulse's /api/stats is public and is the fleet health
+// authority anyway. Caveat worth keeping in mind when reading a green dot: it
+// means the container is *running*, not that the app is serving a good response.
+let appState: Record<string, string> = {};
+let appCount = 0;
+let stamp = '';
 try {
-	const res = await fetch('https://status.jimmyhoughjr.net/fleet/board.json');
-	const board = await res.json();
-	fleetStamp = (board.stamp || '').split(' — ')[0];
-	for (const section of board.sections || []) {
-		if (section.kind !== 'cards') continue;
-		for (const item of section.items || []) fleet[item.id] = item;
+	const res = await fetch('https://pulse.jimmyhoughjr.net/api/stats');
+	if (res.ok) {
+		const stats = (await res.json()) as { apps?: { name: string; state: string }[] };
+		for (const app of stats.apps ?? []) appState[app.name] = app.state;
+		appCount = stats.apps?.length ?? 0;
+		stamp = new Date().toLocaleDateString('en-US', {
+			year: 'numeric',
+			month: 'short',
+			day: 'numeric',
+		});
 	}
 } catch {
-	/* board unreachable at build time: dots render as unknown */
+	/* pulse unreachable at build time: dots render as unknown */
 }
 
-const services = [
-	{
-		id: 'status',
-		name: 'Status',
-		href: 'https://status.jimmyhoughjr.net',
-		desc: 'live status boards for my projects.',
-	},
+interface Service {
+	id: string; // dokku app name, as pulse reports it
+	name: string;
+	href?: string; // omitted for things with no browsable page
+	desc: string;
+	source?: string;
+	note?: string;
+}
+
+// Things anyone can walk up to and use.
+const apps: Service[] = [
 	{
 		id: 'watts',
 		name: 'Watts',
@@ -46,11 +58,22 @@ const services = [
 		desc: 'measured implementation shootouts on my home server. First bout: the same service in Node vs Swift/Hummingbird 2.',
 	},
 	{
-		id: 'pulse',
-		name: 'Pulse',
-		href: 'https://pulse.jimmyhoughjr.net',
-		desc: 'realtime CPU and memory for every app on the box.',
+		id: 'tokipwnage',
+		name: 'Toki Pwnage',
+		href: 'https://tokipwnage.jimmyhoughjr.net',
+		desc: 'a dictionary and phrase builder for Toki Pona, the 120-word constructed language.',
+		source: 'https://github.com/jhoughjr/tokipwnage',
 	},
+	{
+		id: 'bin-brigade',
+		name: 'Eco-Clean',
+		href: 'https://eco-clean.jimmyhoughjr.net',
+		desc: 'bins and exteriors, cleaned on a schedule — a real service business, with its own booking and scheduling, running on the same box as everything else.',
+	},
+];
+
+// The machinery the apps sit on. Less to look at, more of the actual work.
+const platform: Service[] = [
 	{
 		id: 'docs',
 		name: 'Roost',
@@ -58,12 +81,75 @@ const services = [
 		desc: 'the platform all of this runs on: one small box, Dokku, a Cloudflare tunnel, and one command from nothing to a live app.',
 		source: 'https://github.com/jhoughjr/roost',
 	},
+	{
+		id: 'pulse',
+		name: 'Pulse',
+		href: 'https://pulse.jimmyhoughjr.net',
+		desc: 'realtime CPU, memory, disk and watts for every app and every node in the fleet. The dots above come from its API.',
+	},
+	{
+		id: 'vault',
+		name: 'Vault',
+		href: 'https://vault.jimmyhoughjr.net',
+		desc: 'sign-in and per-app authorization for everything on the domain that is gated, written in Swift on Hummingbird.',
+	},
+	{
+		id: 'status',
+		name: 'Status boards',
+		href: 'https://status.jimmyhoughjr.net',
+		desc: 'CI results, test counts, coverage and deploy history for the projects I work on, regenerated on a schedule.',
+		note: 'sign-in required',
+	},
+	{
+		id: 'ci-live',
+		name: 'CI relay',
+		href: 'https://ci.jimmyhoughjr.net',
+		desc: 'a status board is a static file, so it can never show a run that started since the last rebuild. This little relay holds the in-flight ones. The root URL is the API describing itself.',
+		source: 'https://github.com/jhoughjr/ci-live',
+	},
+	{
+		// Deliberately unlinked: it is an API with no browsable root, so a link
+		// would just hand a visitor a bare 404 body. The dot still reports it.
+		id: 'mwlab',
+		name: 'Lab stack',
+		desc: 'a full staging copy of a Swift API I work on, plus its payment and messaging services — three apps, declared in OpenTofu and stood up from scratch on the same box. API only and behind auth, so there is nothing to click.',
+	},
+];
+
+// Code I'd actually point someone at. The full list, generated from GitHub, is
+// on the portfolio page.
+const built = [
+	{
+		name: 'Roost',
+		href: 'https://github.com/jhoughjr/roost',
+		desc: 'the self-hosting platform above — provisioning, deploys, status collection, storage telemetry and a plugin architecture, driven from one command.',
+	},
+	{
+		name: 'statusgen',
+		href: 'https://github.com/jhoughjr/statusgen',
+		desc: 'data-driven status boards: JSON in, styled HTML out, deployed behind the tunnel.',
+	},
+	{
+		name: 'Morser',
+		href: 'https://github.com/jhoughjr/Morser',
+		desc: 'an iOS and Mac app for learning Morse code, built on AudioKit.',
+	},
+	{
+		name: 'Helix Guide',
+		href: 'https://github.com/jhoughjr/helix-guide',
+		desc: 'a study guide app for the Helix editor, for Apple platforms.',
+	},
+	{
+		name: 'fridge-node',
+		href: 'https://github.com/jhoughjr/fridge-node',
+		desc: 'an ESP32-C6 temperature and humidity node written in Embedded Swift, reporting to a dashboard.',
+	},
 ];
 
 function dotClass(id: string) {
-	const pill = fleet[id]?.pill;
-	if (!pill) return 'unknown';
-	return pill.tone === 'go' ? 'up' : 'down';
+	const state = appState[id];
+	if (!state) return 'unknown';
+	return state === 'running' ? 'up' : 'down';
 }
 ---
 
@@ -93,10 +179,21 @@ function dotClass(id: string) {
 				font-size: 0.8em;
 				color: rgb(var(--gray));
 			}
+			.gated {
+				font-size: 0.85em;
+				color: rgb(var(--gray));
+			}
 			.post-date {
 				font-size: 0.85em;
 				color: rgb(var(--gray));
 				margin-left: 0.5em;
+			}
+			h3 {
+				margin: 1.5rem 0 0.5rem;
+				font-size: 1.1rem;
+			}
+			ul.services li {
+				margin-bottom: 0.6rem;
 			}
 		</style>
 	</head>
@@ -106,20 +203,44 @@ function dotClass(id: string) {
 			<h1>Jimmy Hough Jr</h1>
 			<p>
 				Software developer, twenty years in — mostly Swift, always agile.
-				Everything on this domain runs on a single small computer in my house.
+				Everything on this domain runs on a single small computer in my house,
+				on a platform I built called <a href="https://docs.jimmyhoughjr.net">Roost</a
+				>{appCount > 0 && <> — {appCount} apps on one box</>}.
 				<a href="/about/">More about me</a>, or browse the
 				<a href="/blog/">blog</a> and <a href="/portfolio/">portfolio</a>.
 			</p>
+
 			<h2>Things I run</h2>
-			<ul>
+			<h3>Apps</h3>
+			<ul class="services">
 				{
-					services.map((s) => (
+					apps.map((s) => (
 						<li>
-							<span class={`dot ${dotClass(s.id)}`} title={fleet[s.id]?.note} />
+							<span class={`dot ${dotClass(s.id)}`} title={appState[s.id]} />
 							<a href={s.href}>{s.name}</a> — {s.desc}
 							{s.source && (
 								<>
-									Copy the pattern (<a href={s.source}>source</a>).
+									{' '}
+									(<a href={s.source}>source</a>)
+								</>
+							)}
+						</li>
+					))
+				}
+			</ul>
+
+			<h3>The platform underneath</h3>
+			<ul class="services">
+				{
+					platform.map((s) => (
+						<li>
+							<span class={`dot ${dotClass(s.id)}`} title={appState[s.id]} />
+							{s.href ? <a href={s.href}>{s.name}</a> : <strong>{s.name}</strong>} — {s.desc}
+							{s.note && <span class="gated"> ({s.note})</span>}
+							{s.source && (
+								<>
+									{' '}
+									(<a href={s.source}>source</a>)
 								</>
 							)}
 						</li>
@@ -127,13 +248,36 @@ function dotClass(id: string) {
 				}
 			</ul>
 			{
-				fleetStamp && (
+				stamp && (
 					<p class="fleet-stamp">
-						Dots checked at build time ({fleetStamp}) —
-						<a href="https://status.jimmyhoughjr.net/fleet/"> live fleet board</a>.
+						Dots show whether each app's container was running when this page was
+						built ({stamp}) — <a href="https://pulse.jimmyhoughjr.net">live numbers on Pulse</a>.
 					</p>
 				)
 			}
+
+			<h2>Things I've built</h2>
+			<p>
+				Day to day I build a point-of-sale and repair-tracking system for a Mac
+				repair shop — an Electron app in TypeScript against a Swift API, with a
+				signed release pipeline and an end-to-end suite that runs on my own CI
+				runners. That work is private, but the habits show up in everything
+				below. Some of what's public:
+			</p>
+			<ul class="services">
+				{
+					built.map((p) => (
+						<li>
+							<a href={p.href}>{p.name}</a> — {p.desc}
+						</li>
+					))
+				}
+			</ul>
+			<p>
+				The <a href="/portfolio/">portfolio</a> lists every public repository,
+				with languages and commit counts pulled from GitHub at build time.
+			</p>
+
 			<h2>Recent writing</h2>
 			<ul>
 				{
